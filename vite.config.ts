@@ -18,8 +18,8 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       manifest: {
-        name: "Meu XMPP",
-        short_name: "XMPP",
+        name: "Converse App",
+        short_name: "Converse",
         description: "Comunicação XMPP segura e moderna",
         display: "standalone",
         display_override: ["window-controls-overlay"],
