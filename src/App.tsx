@@ -107,7 +107,7 @@ function App() {
   
   const currentContact = activeChat && contacts[activeChat] 
     ? contacts[activeChat] 
-    : { jid: '', name: 'Selecione', presence: 'unavailable' as const, avatar: undefined };
+    : { jid: '', name: 'Selecione', presence: 'unavailable' as const, avatar: undefined, isTyping: false };
   
   const currentMessages = activeChat && messages[activeChat] ? messages[activeChat].map(m => ({
     id: m.stanzaId,

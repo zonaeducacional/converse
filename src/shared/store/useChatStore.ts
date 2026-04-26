@@ -140,23 +140,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const body = msgStanza.getChildText('body');
       if (!body) return; // Ignora Chat States e acks vazios
 
-      const fromJid = msgStanza.attrs.from;
+      const msgFromJid = msgStanza.attrs.from;
       const toJid = msgStanza.attrs.to;
       const myBareJid = xmppClient.getClient()?.jid?.bare().toString() || '';
       
-      if (!fromJid || !toJid) return;
+      if (!msgFromJid || !toJid) return;
 
-      const bareFrom = fromJid.split('/')[0];
+      const msgBareFrom = msgFromJid.split('/')[0];
       const bareTo = toJid.split('/')[0];
       
-      const isOwn = bareFrom === myBareJid;
-      const withJid = isOwn ? bareTo : bareFrom;
+      const isOwn = msgBareFrom === myBareJid;
+      const withJid = isOwn ? bareTo : msgBareFrom;
       const messageId = resultNode?.attrs.id || msgStanza.attrs.id || `msg-${Date.now()}`;
       
       const newMsg: MessageRecord = {
         stanzaId: messageId,
         withJid,
-        from: bareFrom,
+        from: msgBareFrom,
         to: bareTo,
         body,
         timestamp,

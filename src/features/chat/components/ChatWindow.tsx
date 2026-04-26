@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, MoreVertical, Phone, Video, Smile } from 'lucide-react';
 import { MessageBubble, MessageBubbleProps } from './MessageBubble';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useChatStore } from '../../shared/store/useChatStore';
+import { useChatStore } from '../../../shared/store/useChatStore';
 
 export interface ChatContact {
   jid: string;
