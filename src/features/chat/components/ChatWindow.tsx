@@ -94,7 +94,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           <div className="min-w-0">
             <h2 className="font-semibold text-base sm:text-lg truncate">{contact.name}</h2>
             <p className="text-[13px] text-muted font-sans truncate">
-              {isTyping ? <span className="text-brand animate-pulse">digitando...</span> : contact.presence}
+              {isTyping ? (
+                <span className="text-brand animate-pulse">digitando...</span>
+              ) : (
+                {
+                  available: 'Online',
+                  away: 'Ausente',
+                  dnd: 'Ocupado',
+                  unavailable: 'Offline'
+                }[contact.presence] || 'Offline'
+              )}
             </p>
           </div>
         </div>
