@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, MoreVertical, Phone, Video, Smile } from 'lucide-react';
+import { Send, Smile } from 'lucide-react';
 import { MessageBubble, MessageBubbleProps } from './MessageBubble';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useChatStore } from '../../../shared/store/useChatStore';
@@ -100,15 +100,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         </div>
         
         <div className="flex items-center gap-1 sm:gap-2">
-          <button className="p-2 hidden sm:block rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted transition-colors" aria-label="Chamada de áudio">
-            <Phone className="w-[20px] h-[20px]" />
-          </button>
-          <button className="p-2 hidden sm:block rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted transition-colors" aria-label="Chamada de vídeo">
-            <Video className="w-[20px] h-[20px]" />
-          </button>
-          <button className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted transition-colors" aria-label="Mais opções">
-            <MoreVertical className="w-[20px] h-[20px]" />
-          </button>
+          {/* Espaço reservado para ações futuras do chat */}
         </div>
       </header>
 
