@@ -11,6 +11,7 @@ interface ChatState {
   sendMessage: (body: string) => Promise<void>;
   initListeners: () => void;
   loadRoster: () => Promise<void>;
+  loadHistory: (withJid?: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -76,45 +77,78 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Escutando mensagens que chegam
     const handleIncomingMessage = async (e: Event) => {
       const stanza = (e as CustomEvent).detail;
-      const body = stanza.getChildText('body');
-      const fromJid = stanza.attrs.from;
       
-      if (!body || !fromJid) return;
+      // Verifica se é uma mensagem do MAM (Histórico arquivado XEP-0313)
+      const resultNode = stanza.getChild('result', 'urn:xmpp:mam:2');
+      let isMam = false;
+      let timestamp = new Date().toISOString();
+      let msgStanza = stanza;
+
+      if (resultNode) {
+        const forwardedNode = resultNode.getChild('forwarded', 'urn:xmpp:forward:0');
+        if (forwardedNode) {
+          isMam = true;
+          const delayNode = forwardedNode.getChild('delay', 'urn:xmpp:delay');
+          if (delayNode && delayNode.attrs.stamp) timestamp = delayNode.attrs.stamp;
+          
+          const fwdMsg = forwardedNode.getChild('message', 'jabber:client') || forwardedNode.getChild('message');
+          if (fwdMsg) msgStanza = fwdMsg;
+          else return;
+        }
+      }
+
+      const body = msgStanza.getChildText('body');
+      if (!body) return; // Ignora Chat States e acks vazios
+
+      const fromJid = msgStanza.attrs.from;
+      const toJid = msgStanza.attrs.to;
+      const myBareJid = xmppClient.getClient()?.jid?.bare().toString() || '';
       
-      const bareJid = fromJid.split('/')[0];
-      const messageId = stanza.attrs.id || `inc-${Date.now()}`;
+      if (!fromJid || !toJid) return;
+
+      const bareFrom = fromJid.split('/')[0];
+      const bareTo = toJid.split('/')[0];
+      
+      const isOwn = bareFrom === myBareJid;
+      const withJid = isOwn ? bareTo : bareFrom;
+      const messageId = resultNode?.attrs.id || msgStanza.attrs.id || `msg-${Date.now()}`;
       
       const newMsg: MessageRecord = {
         stanzaId: messageId,
-        withJid: bareJid,
-        from: bareJid,
-        to: xmppClient.getClient()?.jid?.bare().toString() || '',
+        withJid,
+        from: bareFrom,
+        to: bareTo,
         body,
-        timestamp: new Date().toISOString(),
-        isOwn: false,
-        status: 'read'
+        timestamp,
+        isOwn,
+        status: isOwn ? 'read' : 'read'
       };
 
-      await db.messages.add(newMsg);
+      // Se a mensagem já existe (evitar duplicar histórico), ignora
+      const exists = await db.messages.where({ stanzaId: messageId }).count();
+      if (exists > 0) return;
 
-      // Adiciona o contato dinamicamente se for o primeiro papo
+      await db.messages.add(newMsg).catch(() => {});
+
       set((state) => {
         let contactsObj = { ...state.contacts };
-        if (!contactsObj[bareJid]) {
-          contactsObj[bareJid] = { jid: bareJid, name: bareJid.split('@')[0], subscription: 'none', unreadCount: 0 };
+        if (!contactsObj[withJid]) {
+          contactsObj[withJid] = { jid: withJid, name: withJid.split('@')[0], subscription: 'none', unreadCount: 0 };
         }
-        if (state.activeChat !== bareJid) {
-          contactsObj[bareJid].unreadCount += 1;
+        
+        // Não incrementa unread se for histórico do MAM ou mensagem própria
+        if (!isOwn && state.activeChat !== withJid && !isMam) {
+          contactsObj[withJid].unreadCount += 1;
         }
 
-        const chatMessages = state.messages[bareJid] || [];
+        const chatMessages = state.messages[withJid] || [];
+        const mergedMessages = [...chatMessages, newMsg].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
         return { 
           contacts: contactsObj,
-          messages: { ...state.messages, [bareJid]: [...chatMessages, newMsg] } 
+          messages: { ...state.messages, [withJid]: mergedMessages } 
         };
       });
-
-      // Toca o som ou web push se em background (será chamado pelo PWA worker depois)
     };
 
     xmppClient.addEventListener('message', handleIncomingMessage);
@@ -142,5 +176,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (e) {
       console.error('Erro ao processar e salvar Roster:', e);
     }
+  },
+
+  loadHistory: async (withJid?: string) => {
+    await xmppClient.fetchHistory(withJid);
   }
 }));

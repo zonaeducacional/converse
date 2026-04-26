@@ -15,6 +15,7 @@ function App() {
     if (status === 'online') {
       initListeners();
       loadRoster();
+      useChatStore.getState().loadHistory(); // Puxa histórico do servidor (MAM)
 
       
       // Cria um chat consigo mesmo (Bloco de Notas). No XMPP, enviar para si mesmo funciona como um "Eco" nativo do servidor!

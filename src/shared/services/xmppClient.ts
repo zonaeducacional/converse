@@ -171,6 +171,40 @@ export class XMPPClientService extends EventTarget {
       return [];
     }
   }
+
+  public async fetchHistory(withJid?: string): Promise<void> {
+    if (!this.xmpp || this.status !== 'online') return;
+
+    const iqId = `mam-${Date.now()}`;
+    const queryNode = xml('query', { xmlns: 'urn:xmpp:mam:2', queryid: iqId });
+    
+    // Filtrar o histórico por um contato específico (Opcional, senão puxa os últimos globais)
+    if (withJid) {
+       queryNode.append(
+         xml('x', { xmlns: 'jabber:x:data', type: 'submit' },
+           xml('field', { var: 'FORM_TYPE', type: 'hidden' }, xml('value', {}, 'urn:xmpp:mam:2')),
+           xml('field', { var: 'with' }, xml('value', {}, withJid))
+         )
+       );
+    }
+
+    // Paginação RSM (Result Set Management) - Pega os últimos 50
+    queryNode.append(
+       xml('set', { xmlns: 'http://jabber.org/protocol/rsm' }, 
+         xml('max', {}, '50'),
+         xml('before')
+       )
+    );
+
+    const iq = xml('iq', { type: 'set', id: iqId }, queryNode);
+    
+    try {
+      // Envia o pedido de arquivo. As mensagens virão via evento "message" como "forwarded"
+      await this.xmpp.sendReceive(iq);
+    } catch (e) {
+      console.error('Aviso MAM (Histórico pode não ser suportado pelo server):', e);
+    }
+  }
   
   public async send(stanza: any) {
     if (!this.xmpp || this.status !== 'online') throw new Error('Cliente XMPP offline.');
