@@ -20,6 +20,7 @@ export interface ContactRecord {
   unreadCount: number;
   statusMessage?: string;
   presence?: 'available' | 'away' | 'dnd' | 'unavailable';
+  isTyping?: boolean;
 }
 
 export class XmppDatabase extends Dexie {

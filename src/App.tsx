@@ -12,6 +12,11 @@ function App() {
 
   // Inicia os listeners assim que conecta e busca a lista de contatos (Roster) real
   useEffect(() => {
+    // Solicita permissão para Notificações Web Push (PWA) nativas
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
     if (status === 'online') {
       initListeners();
       loadRoster();
@@ -137,6 +142,7 @@ function App() {
             }} 
             messages={currentMessages} 
             onSendMessage={sendMessage} 
+            isTyping={currentContact.isTyping} 
           />
         ) : (
           <div className="flex-1 flex items-center justify-center font-medium text-muted">

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, MoreVertical, Phone, Video, Smile } from 'lucide-react';
 import { MessageBubble, MessageBubbleProps } from './MessageBubble';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { useChatStore } from '../../shared/store/useChatStore';
 
 export interface ChatContact {
   jid: string;
@@ -41,11 +42,26 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [messages.length, rowVirtualizer]);
 
+  const { sendChatState } = useChatStore();
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInputText(val);
+    
+    // Dispara XEP-0085 "composing" apenas no primeiro caractere
+    if (val.length > 0 && inputText.length === 0) {
+       sendChatState('composing');
+    } else if (val.length === 0) {
+       sendChatState('active'); // 'active' significa que parou de digitar
+    }
+  };
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     onSendMessage(inputText.trim());
     setInputText('');
+    sendChatState('active');
   };
 
   return (
@@ -146,7 +162,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           
           <textarea
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={handleTextChange}
             placeholder="Mensagem..."
             className="w-full max-h-32 bg-transparent text-[16px] focus:outline-none resize-none py-3.5 px-2 scrollbar-thin font-sans"
             rows={1}

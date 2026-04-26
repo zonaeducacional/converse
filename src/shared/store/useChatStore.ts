@@ -9,6 +9,7 @@ interface ChatState {
   activeChat: string | null;
   setActiveChat: (jid: string) => void;
   sendMessage: (body: string) => Promise<void>;
+  sendChatState: (state: 'composing' | 'active' | 'paused') => void;
   initListeners: () => void;
   loadRoster: () => Promise<void>;
   loadHistory: (withJid?: string) => Promise<void>;
@@ -73,11 +74,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  sendChatState: (chatState) => {
+    const { activeChat } = get();
+    if (!activeChat) return;
+    const stanza = xml('message', { type: 'chat', to: activeChat },
+      xml(chatState, { xmlns: 'http://jabber.org/protocol/chatstates' })
+    );
+    xmppClient.send(stanza).catch(() => {});
+  },
+
   initListeners: () => {
     // Escutando mensagens que chegam
     const handleIncomingMessage = async (e: Event) => {
       const stanza = (e as CustomEvent).detail;
+      const fromJid = stanza.attrs.from;
+      if (!fromJid) return;
+      const bareFrom = fromJid.split('/')[0];
+
+      // 1. Verifica se é um Recibo de Leitura (XEP-0184) - Ticks Azuis
+      const receivedNode = stanza.getChild('received', 'urn:xmpp:receipts');
+      if (receivedNode) {
+        const msgId = receivedNode.attrs.id;
+        db.messages.where({ stanzaId: msgId }).modify({ status: 'read' }).catch(() => {});
+        set((state) => {
+           const chatMsgs = (state.messages[bareFrom] || []).map(m => m.stanzaId === msgId ? { ...m, status: 'read' as const } : m);
+           return { messages: { ...state.messages, [bareFrom]: chatMsgs } };
+        });
+        return; // Recibos de leitura não têm corpo, encerra o processamento
+      }
+
+      // 2. Verifica Chat State (XEP-0085) - "Digitando..."
+      const isComposing = !!stanza.getChild('composing', 'http://jabber.org/protocol/chatstates');
+      const isPaused = !!stanza.getChild('paused', 'http://jabber.org/protocol/chatstates');
+      const isActive = !!stanza.getChild('active', 'http://jabber.org/protocol/chatstates');
       
+      if (isComposing || isPaused || isActive) {
+         set((state) => {
+            const contacts = { ...state.contacts };
+            if (contacts[bareFrom]) {
+               contacts[bareFrom] = { ...contacts[bareFrom], isTyping: isComposing };
+            }
+            return { contacts };
+         });
+      }
+
       // Verifica se é uma mensagem do MAM (Histórico arquivado XEP-0313)
       const resultNode = stanza.getChild('result', 'urn:xmpp:mam:2');
       let isMam = false;
@@ -128,7 +168,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const exists = await db.messages.where({ stanzaId: messageId }).count();
       if (exists > 0) return;
 
-      await db.messages.add(newMsg).catch(() => {});
+      // Enviar Recibo de Leitura automaticamente se solicitado (XEP-0184)
+      if (msgStanza.getChild('request', 'urn:xmpp:receipts') && messageId && !isOwn && !isMam) {
+        const receiptStanza = xml('message', { to: fromJid, id: `ack-${Date.now()}` },
+           xml('received', { xmlns: 'urn:xmpp:receipts', id: messageId })
+        );
+        xmppClient.send(receiptStanza).catch(() => {});
+      }
+
+      // Aciona Notificação PWA Nativa (Fase 4)
+      if (document.visibilityState === 'hidden' && !isMam && !isOwn && Notification.permission === 'granted') {
+         new Notification(`Nova mensagem de ${bareFrom.split('@')[0]}`, { 
+           body, 
+           icon: '/icons/icon-192x192.png',
+           vibrate: [200, 100, 200]
+         } as any);
+      }
 
       set((state) => {
         let contactsObj = { ...state.contacts };
@@ -151,7 +206,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
     };
 
+    const handlePresence = (e: Event) => {
+      const stanza = (e as CustomEvent).detail;
+      const fromJid = stanza.attrs.from;
+      if (!fromJid) return;
+      const bareFrom = fromJid.split('/')[0];
+      
+      const type = stanza.attrs.type;
+      const show = stanza.getChildText('show');
+      
+      let presenceState: 'available' | 'away' | 'dnd' | 'unavailable' = 'available';
+      if (type === 'unavailable') presenceState = 'unavailable';
+      else if (show === 'away' || show === 'xa') presenceState = 'away';
+      else if (show === 'dnd') presenceState = 'dnd';
+
+      set((state) => {
+        const contacts = { ...state.contacts };
+        if (contacts[bareFrom]) {
+          contacts[bareFrom] = { ...contacts[bareFrom], presence: presenceState };
+        }
+        return { contacts };
+      });
+    };
+
     xmppClient.addEventListener('message', handleIncomingMessage);
+    xmppClient.addEventListener('presence', handlePresence);
   },
 
   loadRoster: async () => {
