@@ -89,7 +89,7 @@ self.addEventListener('push', (event) => {
     },
     // Vibração: curtas pulsações (se suportado pelo dispositivo)
     vibrate: [200, 100, 200]
-  };
+  } as any;
 
   event.waitUntil(
     self.registration.showNotification(data.title || 'Nova Mensagem - XMPP', options)
