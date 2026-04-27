@@ -17,6 +17,7 @@
     "@xmpp/debug": "^0.13.1",
     "dexie": "^4.0.1",
     "dexie-react-hooks": "^1.1.7",
+    "emoji-picker-react": "^4.19.0",
     "framer-motion": "^11.0.8",
     "i18next": "^23.10.1",
     "lucide-react": "^0.359.0",

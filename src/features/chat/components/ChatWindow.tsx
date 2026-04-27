@@ -3,6 +3,7 @@ import { Send, Smile, ArrowLeft } from 'lucide-react';
 import { MessageBubble, MessageBubbleProps } from './MessageBubble';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useChatStore } from '../../../shared/store/useChatStore';
+import EmojiPicker from 'emoji-picker-react';
 
 export interface ChatContact {
   jid: string;
@@ -27,6 +28,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onBack 
 }) => {
   const [inputText, setInputText] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
 
   // TanStack Virtualizer: Obrigatório para performance caso o chat tenha milhares de mensagens (MAM)
@@ -60,10 +62,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
-    onSendMessage(inputText.trim());
-    setInputText('');
-    sendChatState('active');
+    if (inputText.trim()) {
+      onSendMessage(inputText.trim());
+      setInputText('');
+      setShowEmojiPicker(false);
+      // Foco de volta no input é ideal após enviar, React lida com onBlur/onFocus bem
+      sendChatState('active');
+    }
   };
 
   return (
@@ -159,14 +164,29 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       </div>
 
       {/* Input de Mensagem */}
-      <footer className="p-3 sm:p-4 bg-surface dark:bg-surface-dark border-t border-border">
+      <footer className="p-3 sm:p-4 bg-surface dark:bg-surface-dark border-t border-border relative">
+        {/* Painel de Emoji */}
+        {showEmojiPicker && (
+          <div className="absolute bottom-[calc(100%-8px)] left-2 sm:left-4 z-50 shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] rounded-[20px] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <EmojiPicker 
+              onEmojiClick={(emojiData) => {
+                setInputText((prev) => prev + emojiData.emoji);
+              }}
+              theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light' as any}
+              searchPlaceHolder="Buscar emoji..."
+              lazyLoadEmojis={true}
+            />
+          </div>
+        )}
+
         <form 
           onSubmit={handleSend}
           className="max-w-5xl mx-auto flex items-end gap-2 bg-black/5 dark:bg-white/5 rounded-3xl p-1.5 transition-all focus-within:ring-1 focus-within:ring-brand/50 focus-within:bg-surface dark:focus-within:bg-surface-dark border border-transparent focus-within:border-border shadow-sm"
         >
           <button 
             type="button"
-            className="p-3 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted transition-colors flex-shrink-0"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className={`p-3 rounded-full transition-colors flex-shrink-0 ${showEmojiPicker ? 'bg-brand/10 text-brand' : 'hover:bg-black/5 dark:hover:bg-white/10 text-muted'}`}
             aria-label="Inserir emoji"
           >
             <Smile className="w-6 h-6" />
