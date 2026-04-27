@@ -15,6 +15,8 @@ interface ChatState {
   loadHistory: (withJid?: string) => Promise<void>;
 }
 
+let isListenersInitialized = false;
+
 export const useChatStore = create<ChatState>((set, get) => ({
   contacts: {},
   messages: {},
@@ -84,6 +86,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   initListeners: () => {
+    if (isListenersInitialized) return;
+    isListenersInitialized = true;
+
     // Escutando mensagens que chegam
     const handleIncomingMessage = async (e: Event) => {
       const stanza = (e as CustomEvent).detail;
