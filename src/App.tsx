@@ -7,8 +7,28 @@ import { useChatStore } from './shared/store/useChatStore';
 function App() {
   const { status, error, connect, disconnect } = useXMPP();
   const { contacts, messages, activeChat, setActiveChat, sendMessage, initListeners, loadRoster } = useChatStore();
-  const [jid, setJid] = useState('');
-  const [password, setPassword] = useState('');
+  const [jid, setJid] = useState(localStorage.getItem('xmpp_jid') || '');
+  const [password, setPassword] = useState(localStorage.getItem('xmpp_password') || '');
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('xmpp_jid'));
+
+  const handleLogout = () => {
+    disconnect();
+    localStorage.removeItem('xmpp_jid');
+    localStorage.removeItem('xmpp_password');
+    setIsAuthenticated(false);
+  };
+
+  // Auto-connect on mount if authenticated
+  useEffect(() => {
+    if (isAuthenticated && jid && password) {
+      // Pequeno timeout para garantir que o Client não está no meio do reconnect nativo
+      setTimeout(() => {
+        if (useXMPP.name) { // Só uma checagem leve
+          connect(jid, password).catch(() => {});
+        }
+      }, 500);
+    }
+  }, [isAuthenticated]);
 
   // Inicia os listeners assim que conecta e busca a lista de contatos (Roster) real
   useEffect(() => {
@@ -22,8 +42,7 @@ function App() {
       loadRoster();
       useChatStore.getState().loadHistory(); // Puxa histórico do servidor (MAM)
 
-      
-      // Cria um chat consigo mesmo (Bloco de Notas). No XMPP, enviar para si mesmo funciona como um "Eco" nativo do servidor!
+      // Cria um chat consigo mesmo (Bloco de Notas)
       if (!activeChat) {
         import('./shared/services/xmppClient').then(({ xmppClient }) => {
           const myJid = xmppClient.getClient()?.jid?.bare().toString() || 'eu@xmpp.jp';
@@ -44,12 +63,15 @@ function App() {
     if (!jid || !password) return;
     try {
       await connect(jid, password);
+      localStorage.setItem('xmpp_jid', jid);
+      localStorage.setItem('xmpp_password', password);
+      setIsAuthenticated(true);
     } catch (err) {
       console.error(err);
     }
   };
 
-  if (status === 'offline' || status === 'connecting') {
+  if (!isAuthenticated) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#F9FAFB] dark:bg-[#09090B] p-4">
         <form onSubmit={handleLogin} className="bg-surface dark:bg-surface-dark p-8 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] w-full max-w-sm border border-border flex flex-col gap-6">
@@ -119,18 +141,24 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F9FAFB] dark:bg-[#09090B]">
-      <div className="hidden sm:flex">
+      {/* Container do RosterPanel (Visível quando não há chat ativo no mobile) */}
+      <div className={`w-full sm:w-[340px] flex-shrink-0 border-r border-border ${activeChat ? 'hidden sm:flex' : 'flex'}`}>
         <RosterPanel 
           contacts={contactList} 
           onSelectContact={(jid) => setActiveChat(jid)} 
           selectedJid={activeChat || undefined} 
+          onLogout={handleLogout}
         />
       </div>
-      <div className="flex-1 flex flex-col relative h-full">
-        {/* Logout rápido sobreposto no header */}
-        <div className="absolute top-4 right-36 z-50">
-           <button onClick={disconnect} className="px-4 py-2 bg-red-500/10 text-red-500 rounded-xl text-[13px] font-bold hover:bg-red-500/20 transition-colors border border-red-500/10">Desconectar Sessão</button>
-        </div>
+
+      {/* Container do ChatWindow */}
+      <div className={`flex-1 flex flex-col relative h-full ${!activeChat ? 'hidden sm:flex' : 'flex'}`}>
+        {/* Banner de Reconexão se houver queda */}
+        {status !== 'online' && (
+          <div className="absolute top-0 left-0 right-0 bg-yellow-500/90 text-white text-[12px] font-bold py-1.5 text-center z-50 shadow-sm animate-pulse">
+            Sinal fraco ou offline. Reconectando ({status})...
+          </div>
+        )}
         
         {activeChat ? (
           <ChatWindow 

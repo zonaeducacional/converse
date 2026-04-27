@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, UserPlus } from 'lucide-react';
+import { Search, UserPlus, LogOut } from 'lucide-react';
 import { PresenceShow } from '../../../shared/hooks/usePresence';
 
 export interface RosterContact {
@@ -15,6 +15,7 @@ interface RosterPanelProps {
   contacts: RosterContact[];
   onSelectContact: (jid: string) => void;
   selectedJid?: string;
+  onLogout?: () => void;
 }
 
 const presenceColors: Record<PresenceShow, string> = {
@@ -24,7 +25,7 @@ const presenceColors: Record<PresenceShow, string> = {
   unavailable: 'bg-unavail',
 };
 
-export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectContact, selectedJid }) => {
+export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectContact, selectedJid, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Busca simples. Debounce pode ser adicionado em buscas no lado do servidor.
@@ -42,12 +43,23 @@ export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectCont
       {/* Header */}
       <header className="h-[72px] p-4 border-b border-border flex items-center justify-between">
         <h2 className="text-xl font-semibold font-sans tracking-tight">Conversas</h2>
-        <button 
-          aria-label="Adicionar contato XMPP"
-          className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors bg-black/5 dark:bg-white/5"
-        >
-          <UserPlus className="w-5 h-5 text-foreground" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button 
+            aria-label="Adicionar contato XMPP"
+            className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors bg-black/5 dark:bg-white/5"
+          >
+            <UserPlus className="w-5 h-5 text-foreground" />
+          </button>
+          {onLogout && (
+            <button 
+              aria-label="Sair"
+              onClick={onLogout}
+              className="p-2.5 rounded-full hover:bg-red-500/10 text-red-500 transition-colors"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Input de Busca */}
