@@ -28,14 +28,15 @@ const presenceColors: Record<PresenceShow, string> = {
 
 export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectContact, selectedJid, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newContactJid, setNewContactJid] = useState('');
 
-  const handleAddContact = () => {
-    const rawJid = window.prompt('Digite o endereço XMPP do contato que deseja adicionar:\nExemplo: fulano@xmpp.jp');
-    if (rawJid && rawJid.includes('@')) {
-      const jid = rawJid.trim().toLowerCase();
+  const handleAddContactSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newContactJid && newContactJid.includes('@')) {
+      const jid = newContactJid.trim().toLowerCase();
       import('../../../shared/services/xmppClient').then(({ xmppClient }) => {
         xmppClient.addContact(jid);
-        // Otimista: Adiciona o contato na lista visualmente
         const currentContacts = useChatStore.getState().contacts;
         useChatStore.setState({
           contacts: {
@@ -43,10 +44,12 @@ export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectCont
              [jid]: { jid, name: jid.split('@')[0], subscription: 'none', unreadCount: 0, presence: 'unavailable' }
           }
         });
-        alert(`Pedido de conexão enviado para ${jid}! Quando a pessoa aceitar ou mandar mensagem, vocês estarão conectados.`);
+        alert(`Pedido enviado para ${jid}! Vocês estarão conectados quando ele aceitar.`);
+        setShowAddModal(false);
+        setNewContactJid('');
       });
-    } else if (rawJid) {
-      alert('Endereço XMPP inválido. Deve conter o @ domínio.');
+    } else if (newContactJid) {
+      alert('Endereço XMPP inválido. Deve conter @.');
     }
   };
 
@@ -67,9 +70,9 @@ export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectCont
         <h2 className="text-xl font-semibold font-sans tracking-tight">Conversas</h2>
         <div className="flex items-center gap-1">
           <button 
-            onClick={handleAddContact}
+            onClick={() => setShowAddModal(true)}
             aria-label="Adicionar contato XMPP"
-            className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors bg-black/5 dark:bg-white/5"
+            className="p-2.5 rounded-full hover:bg-brand/10 hover:text-brand transition-colors bg-black/5 dark:bg-white/5"
           >
             <UserPlus className="w-5 h-5 text-foreground" />
           </button>
@@ -165,6 +168,45 @@ export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectCont
           )}
         </ul>
       </div>
+
+      {/* Modal Customizado para Adicionar Contato */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface dark:bg-surface-dark w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-border">
+            <div className="p-6">
+              <h3 className="text-xl font-bold font-sans text-brand mb-2">Adicionar Contato</h3>
+              <p className="text-sm text-muted mb-6">Digite o endereço XMPP da pessoa que deseja conversar (ex: amigo@xmpp.jp).</p>
+              
+              <form onSubmit={handleAddContactSubmit} className="flex flex-col gap-4">
+                <input
+                  type="email"
+                  autoFocus
+                  placeholder="usuario@dominio.com"
+                  className="w-full px-4 py-3 bg-black/5 dark:bg-white/5 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:bg-surface dark:focus:bg-surface-dark transition-all text-[16px] font-sans"
+                  value={newContactJid}
+                  onChange={(e) => setNewContactJid(e.target.value)}
+                />
+                <div className="flex items-center justify-end gap-3 mt-2">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowAddModal(false)}
+                    className="px-4 py-2.5 rounded-xl text-muted hover:bg-black/5 dark:hover:bg-white/10 font-semibold transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={!newContactJid}
+                    className="px-6 py-2.5 rounded-xl bg-brand text-white font-semibold shadow-md hover:bg-indigo-600 disabled:opacity-50 transition-colors"
+                  >
+                    Convidar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 };
