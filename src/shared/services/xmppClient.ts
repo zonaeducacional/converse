@@ -155,6 +155,23 @@ export class XMPPClientService extends EventTarget {
     await this.xmpp.send(presence);
   }
 
+  public async addContact(jid: string) {
+    if (!this.xmpp || this.status !== 'online') return;
+    // Envia requisição de assinatura para poder ver o status online do contato
+    const presence = xml('presence', { to: jid, type: 'subscribe' });
+    await this.xmpp.send(presence);
+  }
+
+  public async acceptContact(jid: string) {
+    if (!this.xmpp || this.status !== 'online') return;
+    // Aceita o pedido de assinatura recebido
+    const presenceSubscribed = xml('presence', { to: jid, type: 'subscribed' });
+    await this.xmpp.send(presenceSubscribed);
+    // Para termos contato bidirecional, enviamos um pedido de volta
+    const presenceSubscribe = xml('presence', { to: jid, type: 'subscribe' });
+    await this.xmpp.send(presenceSubscribe);
+  }
+
   public async fetchRoster(): Promise<any[]> {
     if (!this.xmpp || this.status !== 'online') throw new Error('Cliente XMPP offline.');
     

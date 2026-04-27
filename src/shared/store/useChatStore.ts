@@ -215,6 +215,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const type = stanza.attrs.type;
       const show = stanza.getChildText('show');
       
+      // Auto-aceitar solicitações de contato (Amizade / Roster)
+      if (type === 'subscribe') {
+        xmppClient.acceptContact(bareFrom).catch(() => {});
+        return;
+      }
+
       let presenceState: 'available' | 'away' | 'dnd' | 'unavailable' = 'available';
       if (type === 'unavailable') presenceState = 'unavailable';
       else if (show === 'away' || show === 'xa') presenceState = 'away';

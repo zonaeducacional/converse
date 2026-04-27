@@ -28,6 +28,26 @@ const presenceColors: Record<PresenceShow, string> = {
 export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectContact, selectedJid, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
+  const handleAddContact = () => {
+    const rawJid = window.prompt('Digite o endereço XMPP do contato que deseja adicionar:\nExemplo: fulano@xmpp.jp');
+    if (rawJid && rawJid.includes('@')) {
+      const jid = rawJid.trim().toLowerCase();
+      import('../../../shared/services/xmppClient').then(({ xmppClient }) => {
+        xmppClient.addContact(jid);
+        // Otimista: Adiciona o contato na lista visualmente
+        useChatStore.setState((state) => ({
+          contacts: {
+             ...state.contacts,
+             [jid]: { jid, name: jid.split('@')[0], subscription: 'none', unreadCount: 0, presence: 'unavailable' }
+          }
+        }));
+        alert(`Pedido de conexão enviado para ${jid}! Quando a pessoa aceitar ou mandar mensagem, vocês estarão conectados.`);
+      });
+    } else if (rawJid) {
+      alert('Endereço XMPP inválido. Deve conter o @ domínio.');
+    }
+  };
+
   // Busca simples. Debounce pode ser adicionado em buscas no lado do servidor.
   const filteredContacts = useMemo(() => {
     if (!searchTerm) return contacts;
@@ -45,6 +65,7 @@ export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectCont
         <h2 className="text-xl font-semibold font-sans tracking-tight">Conversas</h2>
         <div className="flex items-center gap-1">
           <button 
+            onClick={handleAddContact}
             aria-label="Adicionar contato XMPP"
             className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors bg-black/5 dark:bg-white/5"
           >
