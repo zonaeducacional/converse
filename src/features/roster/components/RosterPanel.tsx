@@ -35,12 +35,13 @@ export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectCont
       import('../../../shared/services/xmppClient').then(({ xmppClient }) => {
         xmppClient.addContact(jid);
         // Otimista: Adiciona o contato na lista visualmente
-        useChatStore.setState((state) => ({
+        const currentContacts = useChatStore.getState().contacts;
+        useChatStore.setState({
           contacts: {
-             ...state.contacts,
+             ...currentContacts,
              [jid]: { jid, name: jid.split('@')[0], subscription: 'none', unreadCount: 0, presence: 'unavailable' }
           }
-        }));
+        });
         alert(`Pedido de conexão enviado para ${jid}! Quando a pessoa aceitar ou mandar mensagem, vocês estarão conectados.`);
       });
     } else if (rawJid) {
