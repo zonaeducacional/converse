@@ -84,7 +84,12 @@ function App() {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#F9FAFB] dark:bg-[#09090B] p-4">
         <form onSubmit={handleLogin} className="bg-surface dark:bg-surface-dark p-8 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] w-full max-w-sm border border-border flex flex-col gap-6">
-          <div className="text-center">
+          <div className="text-center flex flex-col items-center">
+            <img 
+              src="/icons/icon-192x192.png" 
+              alt="Logo Converse" 
+              className="w-20 h-20 mb-4 rounded-3xl shadow-md border border-black/5 dark:border-white/10"
+            />
             <h1 className="text-3xl font-bold font-sans tracking-tight text-brand mb-1">Converse</h1>
             <p className="text-[14px] text-muted font-medium">Acesse sua rede federada</p>
           </div>
