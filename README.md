@@ -45,12 +45,24 @@ O diretório `dist` conterá o bundle minifyado e o Manifest PWA pronto para ser
 
 ## 📝 Changelog / Histórico de Funcionalidades
 
-- **v1.0.0-auth:**
+- **v1.0.0-auth (Fase 1 e 2):**
   - Configuração do Vite com Polyfills do Node para suporte a SASL Authentication.
   - Layout Base Responsivo (Tailwind, Dark Mode).
-  - Virtualização da lista de mensagens.
   - Implementação da Store (Zustand) + IndexedDB (Dexie) para loop de gravação local.
-  - Autenticação e roteamento dinâmico via XMPP funcionando (Mensagens de e para o próprio JID roteadas pelo servidor).
+  - Autenticação e roteamento dinâmico via XMPP funcionando.
+
+- **v1.1.0-pwa (Fase 3 e 4):**
+  - Transformação em PWA completo com Service Worker (vite-plugin-pwa).
+  - Design Responsivo Mobile Pro Max (Animações, Overlay, Glassmorphism).
+  - Ícones otimizados e tela de Splash.
+  - Recibos de Leitura (XEP-0184) e "Digitando..." (XEP-0085).
+  - Virtualização de mensagens com `@tanstack/react-virtual` para performance extrema.
+
+- **v1.2.0-social (Fase 5):**
+  - Navegação nativa para Mobile (Botão "Voltar").
+  - Sistema bidirecional de Adição de Contatos com Modal Customizado elegante.
+  - Teclado de Emojis integrado (`emoji-picker-react`).
+  - Correção de duplicação de eventos (Bug do Eco) com flags robustas de Lifecycle.
 
 ---
 *Projeto desenvolvido sob as diretrizes de "Vibe Coding" — Vibe máxima, zero engasgos, foco no usuário final.*
