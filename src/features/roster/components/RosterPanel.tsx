@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, UserPlus, LogOut } from 'lucide-react';
 import { PresenceShow } from '../../../shared/hooks/usePresence';
+import { useChatStore } from '../../../shared/store/useChatStore';
 
 export interface RosterContact {
   jid: string;
