@@ -42,21 +42,30 @@ function App() {
       loadRoster();
       useChatStore.getState().loadHistory(); // Puxa histórico do servidor (MAM)
 
-      // Cria um chat consigo mesmo (Bloco de Notas)
-      if (!activeChat) {
-        import('./shared/services/xmppClient').then(({ xmppClient }) => {
-          const myJid = xmppClient.getClient()?.jid?.bare().toString() || 'eu@xmpp.jp';
-          useChatStore.setState((state) => ({
-            contacts: {
-              ...state.contacts,
-              [myJid]: { jid: myJid, name: 'Meu Bloco de Notas (Eu)', subscription: 'both', unreadCount: 0, presence: 'available', statusMessage: 'Mensagens enviadas aqui voltam para você' }
-            }
-          }));
-          setActiveChat(myJid);
+      // Garante que o contato "Bloco de Notas" exista, mas sem forçar a abertura
+      import('./shared/services/xmppClient').then(({ xmppClient }) => {
+        const myJid = xmppClient.getClient()?.jid?.bare().toString() || 'eu@xmpp.jp';
+        useChatStore.setState((state) => {
+          if (!state.contacts[myJid]) {
+            return {
+              contacts: {
+                ...state.contacts,
+                [myJid]: { 
+                  jid: myJid, 
+                  name: 'Meu Bloco de Notas (Eu)', 
+                  subscription: 'both', 
+                  unreadCount: 0, 
+                  presence: 'available', 
+                  statusMessage: 'Mensagens enviadas aqui voltam para você' 
+                }
+              }
+            };
+          }
+          return state;
         });
-      }
+      });
     }
-  }, [status, activeChat, initListeners, setActiveChat]);
+  }, [status, initListeners]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
