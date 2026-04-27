@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile } from 'lucide-react';
+import { Send, Smile, ArrowLeft } from 'lucide-react';
 import { MessageBubble, MessageBubbleProps } from './MessageBubble';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useChatStore } from '../../../shared/store/useChatStore';
@@ -16,13 +16,15 @@ interface ChatWindowProps {
   messages: MessageBubbleProps[];
   onSendMessage: (text: string) => void;
   isTyping?: boolean;
+  onBack?: () => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({ 
   contact, 
   messages, 
   onSendMessage,
-  isTyping 
+  isTyping,
+  onBack 
 }) => {
   const [inputText, setInputText] = useState('');
   const parentRef = useRef<HTMLDivElement>(null);
@@ -67,8 +69,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   return (
     <main className="flex flex-col h-full w-full bg-[#F9FAFB] dark:bg-black/40">
       {/* Header Fixo */}
-      <header className="h-[72px] px-4 sm:px-6 border-b border-border bg-surface dark:bg-surface-dark flex items-center justify-between shadow-sm z-10">
-        <div className="flex items-center gap-4">
+      <header className="h-[72px] px-2 sm:px-6 border-b border-border bg-surface dark:bg-surface-dark flex items-center justify-between shadow-sm z-10">
+        <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
+          {onBack && (
+            <button 
+              onClick={onBack}
+              className="p-2 sm:hidden rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted transition-colors"
+              aria-label="Voltar para a lista de conversas"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+          )}
           <div className="relative flex-shrink-0">
             {contact.avatar ? (
               <img 

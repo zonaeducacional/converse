@@ -170,7 +170,8 @@ function App() {
             }} 
             messages={currentMessages} 
             onSendMessage={sendMessage} 
-            isTyping={currentContact.isTyping} 
+            isTyping={currentContact.isTyping}
+            onBack={() => setActiveChat(null)}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center font-medium text-muted">

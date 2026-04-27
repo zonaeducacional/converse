@@ -9,6 +9,7 @@ export class XMPPClientService extends EventTarget {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private status: ConnectionStatus = 'offline';
+  private hasConnectedBefore = false;
   
   private constructor() {
     super();
@@ -60,6 +61,7 @@ export class XMPPClientService extends EventTarget {
       this.xmpp.on('online', async (address: any) => {
         if (import.meta.env.DEV) console.log('XMPP Online como', address.toString());
         this.reconnectAttempts = 0;
+        this.hasConnectedBefore = true;
         this.setStatus('online');
         
         // RFC 6121: Enviar presença inicial (available) no login
@@ -99,6 +101,11 @@ export class XMPPClientService extends EventTarget {
   }
 
   private handleReconnect(jid: string, password: string) {
+    if (!this.hasConnectedBefore) {
+      this.setStatus('offline');
+      return; // Se o primeiro login falhou, não tenta auto-reconectar no fundo
+    }
+
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       this.setStatus('offline');
       this.dispatchEvent(new CustomEvent('error', { detail: 'Máximo de tentativas de reconexão atingido.' }));
@@ -128,6 +135,7 @@ export class XMPPClientService extends EventTarget {
     
     await this.xmpp.stop();
     this.xmpp = null;
+    this.hasConnectedBefore = false;
     this.setStatus('offline');
   }
 
