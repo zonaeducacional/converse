@@ -197,6 +197,59 @@ export class XMPPClientService extends EventTarget {
     }
   }
 
+  public async fetchVCard(jid?: string): Promise<{ avatarBase64?: string, statusText?: string, fullName?: string } | null> {
+    if (!this.xmpp || this.status !== 'online') return null;
+    const iq = xml('iq', { type: 'get', ...(jid ? { to: jid } : {}) },
+      xml('vCard', { xmlns: 'vcard-temp' })
+    );
+    try {
+      const res = await this.xmpp.sendReceive(iq);
+      const vCard = res.getChild('vCard', 'vcard-temp');
+      if (!vCard) return null;
+      
+      const photo = vCard.getChild('PHOTO');
+      let avatarBase64;
+      if (photo) {
+        const binval = photo.getChildText('BINVAL');
+        const type = photo.getChildText('TYPE') || 'image/jpeg';
+        if (binval) avatarBase64 = `data:${type};base64,${binval.replace(/\s/g, '')}`;
+      }
+      
+      const fullName = vCard.getChildText('FN');
+      const desc = vCard.getChildText('DESC');
+      
+      return { avatarBase64, fullName, statusText: desc };
+    } catch (e) {
+      console.warn('vCard não suportado ou não existe para', jid);
+      return null;
+    }
+  }
+
+  public async publishVCard(data: { avatarBase64?: string, fullName?: string, statusText?: string }) {
+    if (!this.xmpp || this.status !== 'online') return;
+    
+    const vCardContent = [];
+    if (data.fullName) vCardContent.push(xml('FN', {}, data.fullName));
+    if (data.statusText) vCardContent.push(xml('DESC', {}, data.statusText));
+    
+    if (data.avatarBase64) {
+      const match = data.avatarBase64.match(/^data:(image\/[a-zA-Z]*);base64,(.*)$/);
+      if (match) {
+        vCardContent.push(
+          xml('PHOTO', {},
+            xml('TYPE', {}, match[1]),
+            xml('BINVAL', {}, match[2])
+          )
+        );
+      }
+    }
+
+    const iq = xml('iq', { type: 'set' },
+      xml('vCard', { xmlns: 'vcard-temp' }, ...vCardContent)
+    );
+    await this.xmpp.sendReceive(iq);
+  }
+
   public async fetchHistory(withJid?: string): Promise<void> {
     if (!this.xmpp || this.status !== 'online') return;
 

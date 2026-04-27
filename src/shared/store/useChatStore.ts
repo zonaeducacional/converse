@@ -260,6 +260,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
         };
         // Persiste fisicamente no IndexedDB
         await db.contacts.put(newContacts[bareJid]).catch(() => {});
+        
+        // Busca vCard de forma assíncrona (não bloqueante)
+        xmppClient.fetchVCard(bareJid).then(vCard => {
+          if (vCard && (vCard.avatarBase64 || vCard.fullName || vCard.statusText)) {
+            useChatStore.setState(state => {
+               const c = state.contacts[bareJid];
+               if (!c) return state;
+               const updated = { 
+                 ...c, 
+                 avatar: vCard.avatarBase64 || c.avatar, 
+                 name: vCard.fullName || c.name, 
+                 statusMessage: vCard.statusText || c.statusMessage 
+               };
+               db.contacts.put(updated).catch(() => {});
+               return { contacts: { ...state.contacts, [bareJid]: updated } };
+            });
+          }
+        }).catch(() => {});
       }
       
       set({ contacts: newContacts });

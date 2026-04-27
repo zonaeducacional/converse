@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Search, UserPlus, LogOut } from 'lucide-react';
+import { Search, UserPlus, LogOut, User } from 'lucide-react';
 import { PresenceShow } from '../../../shared/hooks/usePresence';
 import { useChatStore } from '../../../shared/store/useChatStore';
+import { ProfileModal } from '../../profile/components/ProfileModal';
 
 export interface RosterContact {
   jid: string;
@@ -29,6 +30,7 @@ const presenceColors: Record<PresenceShow, string> = {
 export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectContact, selectedJid, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [newContactJid, setNewContactJid] = useState('');
 
   const handleAddContactSubmit = (e: React.FormEvent) => {
@@ -67,7 +69,16 @@ export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectCont
     <aside className="flex flex-col h-full bg-surface dark:bg-surface-dark border-r border-border w-full max-w-[340px] shadow-[1px_0_10px_rgba(0,0,0,0.02)]">
       {/* Header */}
       <header className="h-[72px] p-4 border-b border-border flex items-center justify-between">
-        <h2 className="text-xl font-semibold font-sans tracking-tight">Conversas</h2>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setShowProfileModal(true)}
+            className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center hover:bg-brand/20 transition-colors shrink-0"
+            aria-label="Meu Perfil"
+          >
+            <User className="w-5 h-5" />
+          </button>
+          <h2 className="text-xl font-semibold font-sans tracking-tight">Conversas</h2>
+        </div>
         <div className="flex items-center gap-1">
           <button 
             onClick={() => setShowAddModal(true)}
@@ -207,6 +218,9 @@ export const RosterPanel: React.FC<RosterPanelProps> = ({ contacts, onSelectCont
           </div>
         </div>
       )}
+
+      {/* Modal de Perfil */}
+      {showProfileModal && <ProfileModal onClose={() => setShowProfileModal(false)} />}
     </aside>
   );
 };
