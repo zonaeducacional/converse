@@ -34,7 +34,7 @@ export class ZulipClientService extends EventTarget {
     this.dispatchEvent(new CustomEvent('status', { detail: newStatus }));
   }
 
-  private getAuthHeader() {
+  private getAuthHeader(): Record<string, string> {
     if (!this.config) return {};
     const auth = btoa(`${this.config.username}:${this.config.apiKey}`);
     return {
