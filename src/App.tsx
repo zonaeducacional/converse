@@ -1,79 +1,118 @@
 import { useState, useEffect } from 'react';
 import { useXMPP } from './shared/hooks/useXMPP';
+import { useZulip } from './shared/hooks/useZulip';
 import { RosterPanel } from './features/roster/components/RosterPanel';
+import { ZulipSidebar } from './features/roster/components/ZulipSidebar';
 import { ChatWindow } from './features/chat/components/ChatWindow';
 import { useChatStore } from './shared/store/useChatStore';
+import { useZulipStore } from './shared/store/useZulipStore';
+
+type Protocol = 'xmpp' | 'zulip';
 
 function App() {
-  const { status, error, connect, disconnect } = useXMPP();
+  const { status: xmppStatus, error: xmppError, connect: xmppConnect, disconnect: xmppDisconnect } = useXMPP();
+  const { status: zulipStatus, error: zulipError, connect: zulipConnect, disconnect: zulipDisconnect } = useZulip();
+  
+  const [protocol, setProtocol] = useState<Protocol>((localStorage.getItem('app_protocol') as Protocol) || 'xmpp');
+  const [isRegistering, setIsRegistering] = useState(false);
+  
   const { contacts, messages, activeChat, setActiveChat, sendMessage, initListeners, loadRoster } = useChatStore();
+  const { 
+    messages: zulipMessages, 
+    activeChat: activeZulipChat, 
+    setActiveChat: setZulipActiveChat, 
+    sendMessage: sendZulipMessage,
+    initListeners: initZulipListeners, 
+    loadInitialData: loadZulipData 
+  } = useZulipStore();
+
   const [jid, setJid] = useState(localStorage.getItem('xmpp_jid') || '');
   const [password, setPassword] = useState(localStorage.getItem('xmpp_password') || '');
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('xmpp_jid'));
+  
+  const [zulipEmail, setZulipEmail] = useState(localStorage.getItem('zulip_email') || '');
+  const [zulipApiKey, setZulipApiKey] = useState(localStorage.getItem('zulip_api_key') || '');
+  const [zulipRealm, setZulipRealm] = useState(localStorage.getItem('zulip_realm') || '');
+  const [fullName, setFullName] = useState('');
+
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    protocol === 'xmpp' ? !!localStorage.getItem('xmpp_jid') : !!localStorage.getItem('zulip_api_key')
+  );
+
+  const status = protocol === 'xmpp' ? xmppStatus : zulipStatus;
+  const error = protocol === 'xmpp' ? xmppError : zulipError;
 
   const handleLogout = () => {
-    disconnect();
+    if (protocol === 'xmpp') xmppDisconnect();
+    else zulipDisconnect();
+    
     localStorage.removeItem('xmpp_jid');
     localStorage.removeItem('xmpp_password');
+    localStorage.removeItem('zulip_email');
+    localStorage.removeItem('zulip_api_key');
+    localStorage.removeItem('zulip_realm');
     setIsAuthenticated(false);
   };
 
   // Auto-connect on mount if authenticated
   useEffect(() => {
-    if (isAuthenticated && jid && password) {
-      // Pequeno timeout para garantir que o Client não está no meio do reconnect nativo
-      setTimeout(() => {
-        if (useXMPP.name) { // Só uma checagem leve
-          connect(jid, password).catch(() => {});
-        }
-      }, 500);
+    if (isAuthenticated) {
+      if (protocol === 'xmpp' && jid && password) {
+        setTimeout(() => xmppConnect(jid, password).catch(() => {}), 500);
+      } else if (protocol === 'zulip' && zulipEmail && zulipApiKey && zulipRealm) {
+        setTimeout(() => zulipConnect({ username: zulipEmail, apiKey: zulipApiKey, realm: zulipRealm }).catch(() => {}), 500);
+      }
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, protocol]);
 
-  // Inicia os listeners assim que conecta e busca a lista de contatos (Roster) real
+  // Inicia os listeners assim que conecta
   useEffect(() => {
-    // Solicita permissão para Notificações Web Push (PWA) nativas
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
 
-    if (status === 'online') {
+    if (protocol === 'xmpp' && xmppStatus === 'online') {
       initListeners();
       loadRoster();
-      useChatStore.getState().loadHistory(); // Puxa histórico do servidor (MAM)
-
-      // Garante que o contato "Bloco de Notas" exista, mas sem forçar a abertura
-      import('./shared/services/xmppClient').then(({ xmppClient }) => {
-        const myJid = xmppClient.getClient()?.jid?.bare().toString() || 'eu@xmpp.jp';
-        useChatStore.setState((state) => {
-          if (!state.contacts[myJid]) {
-            return {
-              contacts: {
-                ...state.contacts,
-                [myJid]: { 
-                  jid: myJid, 
-                  name: 'Meu Bloco de Notas (Eu)', 
-                  subscription: 'both', 
-                  unreadCount: 0, 
-                  presence: 'available', 
-                  statusMessage: 'Mensagens enviadas aqui voltam para você' 
-                }
-              }
-            };
-          }
-          return state;
-        });
-      });
+      useChatStore.getState().loadHistory();
+    } else if (protocol === 'zulip' && zulipStatus === 'online') {
+      initZulipListeners();
+      loadZulipData();
     }
-  }, [status, initListeners]);
+  }, [xmppStatus, zulipStatus, protocol]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!jid || !password) return;
     try {
-      await connect(jid, password);
-      localStorage.setItem('xmpp_jid', jid);
-      localStorage.setItem('xmpp_password', password);
+      if (protocol === 'xmpp') {
+        if (!jid || !password) return;
+        
+        if (isRegistering) {
+          const { xmppClient } = await import('./shared/services/xmppClient');
+          await xmppClient.register(jid, password);
+          alert('Conta criada com sucesso! Conectando...');
+          setIsRegistering(false);
+        }
+
+        await xmppConnect(jid, password);
+        localStorage.setItem('xmpp_jid', jid);
+        localStorage.setItem('xmpp_password', password);
+      } else {
+        if (!zulipEmail || !zulipApiKey || !zulipRealm) return;
+
+        if (isRegistering) {
+          const { zulipClient } = await import('./shared/services/zulipClient');
+          await zulipClient.register(zulipEmail, fullName || 'Novo Aluno'); 
+          alert('Conta Zulip criada! Use a senha padrão: SenhaPadrao123! para entrar agora.');
+          setIsRegistering(false);
+          return;
+        }
+
+        await zulipConnect({ username: zulipEmail, apiKey: zulipApiKey, realm: zulipRealm });
+        localStorage.setItem('zulip_email', zulipEmail);
+        localStorage.setItem('zulip_api_key', zulipApiKey);
+        localStorage.setItem('zulip_realm', zulipRealm);
+      }
+      localStorage.setItem('app_protocol', protocol);
       setIsAuthenticated(true);
     } catch (err) {
       console.error(err);
@@ -91,32 +130,106 @@ function App() {
               className="w-20 h-20 mb-4 rounded-3xl shadow-md border border-black/5 dark:border-white/10"
             />
             <h1 className="text-3xl font-bold font-sans tracking-tight text-brand mb-1">Converse</h1>
-            <p className="text-[14px] text-muted font-medium">Acesse sua rede federada</p>
+            <p className="text-[14px] text-muted font-medium">
+              {isRegistering ? 'Crie sua nova conta gratuita' : 'Acesse sua rede federada'}
+            </p>
           </div>
           
           {error && <p className="text-red-500 text-[13px] text-center font-medium bg-red-500/10 p-3 rounded-xl border border-red-500/20">{error}</p>}
           
+          {/* Seletor de Protocolo */}
+          {!isRegistering && (
+            <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-2xl mb-2">
+              <button 
+                type="button"
+                onClick={() => setProtocol('xmpp')}
+                className={`flex-1 py-2 rounded-xl text-[13px] font-bold transition-all ${protocol === 'xmpp' ? 'bg-surface dark:bg-surface-dark shadow-sm text-brand' : 'text-muted'}`}
+              >
+                XMPP
+              </button>
+              <button 
+                type="button"
+                onClick={() => setProtocol('zulip')}
+                className={`flex-1 py-2 rounded-xl text-[13px] font-bold transition-all ${protocol === 'zulip' ? 'bg-surface dark:bg-surface-dark shadow-sm text-brand' : 'text-muted'}`}
+              >
+                Zulip
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[13px] font-bold text-muted ml-1 uppercase tracking-wider">JID (Usuário)</label>
-              <input 
-                type="email" 
-                className="px-4 py-3.5 bg-black/5 dark:bg-white/5 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/30 focus:bg-surface dark:focus:bg-surface-dark transition-all text-[16px] font-sans placeholder:text-muted/60"
-                value={jid} onChange={e => setJid(e.target.value)}
-                placeholder="ex: voce@xmpp.jp"
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[13px] font-bold text-muted ml-1 uppercase tracking-wider">Senha</label>
-              <input 
-                type="password" 
-                className="px-4 py-3.5 bg-black/5 dark:bg-white/5 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/30 focus:bg-surface dark:focus:bg-surface-dark transition-all text-[16px] font-sans placeholder:text-muted/60"
-                value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="Sua senha secreta"
-                required
-              />
-            </div>
+            {protocol === 'xmpp' ? (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] font-bold text-muted ml-1 uppercase tracking-wider">JID (Usuário)</label>
+                  <input 
+                    type="email" 
+                    className="px-4 py-3.5 bg-black/5 dark:bg-white/5 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/30 focus:bg-surface dark:focus:bg-surface-dark transition-all text-[16px] font-sans placeholder:text-muted/60"
+                    value={jid} onChange={e => setJid(e.target.value)}
+                    placeholder="ex: voce@xmpp.jp"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] font-bold text-muted ml-1 uppercase tracking-wider">Senha</label>
+                  <input 
+                    type="password" 
+                    className="px-4 py-3.5 bg-black/5 dark:bg-white/5 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/30 focus:bg-surface dark:focus:bg-surface-dark transition-all text-[16px] font-sans placeholder:text-muted/60"
+                    value={password} onChange={e => setPassword(e.target.value)}
+                    placeholder="Sua senha secreta"
+                    required
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] font-bold text-muted ml-1 uppercase tracking-wider">Email Zulip</label>
+                  <input 
+                    type="email" 
+                    className="px-4 py-3.5 bg-black/5 dark:bg-white/5 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/30 focus:bg-surface dark:focus:bg-surface-dark transition-all text-[16px] font-sans placeholder:text-muted/60"
+                    value={zulipEmail} onChange={e => setZulipEmail(e.target.value)}
+                    placeholder="voce@zulip.com"
+                    required
+                  />
+                </div>
+                {isRegistering ? (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[13px] font-bold text-muted ml-1 uppercase tracking-wider">Nome Completo</label>
+                    <input 
+                      type="text" 
+                      className="px-4 py-3.5 bg-black/5 dark:bg-white/5 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/30 focus:bg-surface dark:focus:bg-surface-dark transition-all text-[16px] font-sans placeholder:text-muted/60"
+                      value={fullName} onChange={e => setFullName(e.target.value)}
+                      placeholder="Nome do aluno"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[13px] font-bold text-muted ml-1 uppercase tracking-wider">API Key</label>
+                      <input 
+                        type="password" 
+                        className="px-4 py-3.5 bg-black/5 dark:bg-white/5 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/30 focus:bg-surface dark:focus:bg-surface-dark transition-all text-[16px] font-sans placeholder:text-muted/60"
+                        value={zulipApiKey} onChange={e => setZulipApiKey(e.target.value)}
+                        placeholder="Sua API Key do Zulip"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[13px] font-bold text-muted ml-1 uppercase tracking-wider">Realm (URL)</label>
+                      <input 
+                        type="url" 
+                        className="px-4 py-3.5 bg-black/5 dark:bg-white/5 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/30 focus:bg-surface dark:focus:bg-surface-dark transition-all text-[16px] font-sans placeholder:text-muted/60"
+                        value={zulipRealm} onChange={e => setZulipRealm(e.target.value)}
+                        placeholder="https://seu-realm.zulipchat.com"
+                        required
+                      />
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
           
           <button 
@@ -124,12 +237,18 @@ function App() {
             disabled={status === 'connecting'}
             className="mt-2 w-full py-4 bg-brand text-white rounded-2xl font-bold text-[15px] hover:bg-indigo-500 hover:shadow-lg hover:shadow-brand/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 disabled:hover:shadow-none"
           >
-            {status === 'connecting' ? 'Autenticando via SASL...' : 'Conectar agora'}
+            {status === 'connecting' ? 'Processando...' : (isRegistering ? 'Criar minha conta agora' : 'Conectar agora')}
           </button>
           
-          <p className="text-[13px] text-center text-muted mt-2">
-            Sem conta? Crie grátis em <a href="https://xmpp.jp" target="_blank" rel="noreferrer" className="text-brand font-semibold hover:underline">xmpp.jp</a> ou use <a href="https://jabber.org" target="_blank" rel="noreferrer" className="text-brand font-semibold hover:underline">jabber.org</a>
-          </p>
+          <div className="text-[13px] text-center text-muted mt-2">
+            <button 
+              type="button" 
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="text-brand font-semibold hover:underline"
+            >
+              {isRegistering ? 'Já tenho conta, quero entrar' : 'Não tem conta? Clique aqui para criar uma'}
+            </button>
+          </div>
         </form>
       </div>
     );
@@ -155,18 +274,22 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F9FAFB] dark:bg-[#09090B]">
-      {/* Container do RosterPanel (Visível quando não há chat ativo no mobile) */}
-      <div className={`w-full sm:w-[340px] flex-shrink-0 border-r border-border ${activeChat ? 'hidden sm:flex' : 'flex'}`}>
-        <RosterPanel 
-          contacts={contactList} 
-          onSelectContact={(jid) => setActiveChat(jid)} 
-          selectedJid={activeChat || undefined} 
-          onLogout={handleLogout}
-        />
+      {/* Container do Sidebar (Visível quando não há chat ativo no mobile) */}
+      <div className={`w-full sm:w-[340px] flex-shrink-0 border-r border-border ${((protocol === 'xmpp' ? activeChat : activeZulipChat)) ? 'hidden sm:flex' : 'flex'}`}>
+        {protocol === 'xmpp' ? (
+          <RosterPanel 
+            contacts={contactList} 
+            onSelectContact={(jid) => setActiveChat(jid)} 
+            selectedJid={activeChat || undefined} 
+            onLogout={handleLogout}
+          />
+        ) : (
+          <ZulipSidebar onLogout={handleLogout} />
+        )}
       </div>
 
       {/* Container do ChatWindow */}
-      <div className={`flex-1 flex flex-col relative h-full ${!activeChat ? 'hidden sm:flex' : 'flex'}`}>
+      <div className={`flex-1 flex flex-col relative h-full ${!(protocol === 'xmpp' ? activeChat : activeZulipChat) ? 'hidden sm:flex' : 'flex'}`}>
         {/* Banner de Reconexão se houver queda */}
         {status !== 'online' && (
           <div className="absolute top-0 left-0 right-0 bg-yellow-500/90 text-white text-[12px] font-bold py-1.5 text-center z-50 shadow-sm animate-pulse">
@@ -174,23 +297,48 @@ function App() {
           </div>
         )}
         
-        {activeChat ? (
-          <ChatWindow 
-            contact={{
-              jid: currentContact.jid,
-              name: currentContact.name,
-              avatar: currentContact.avatar,
-              presence: currentContact.presence || 'unavailable'
-            }} 
-            messages={currentMessages} 
-            onSendMessage={sendMessage} 
-            isTyping={currentContact.isTyping}
-            onBack={() => setActiveChat('')}
-          />
+        {protocol === 'xmpp' ? (
+          activeChat ? (
+            <ChatWindow 
+              contact={{
+                jid: currentContact.jid,
+                name: currentContact.name,
+                avatar: currentContact.avatar,
+                presence: currentContact.presence || 'unavailable'
+              }} 
+              messages={currentMessages} 
+              onSendMessage={sendMessage} 
+              isTyping={currentContact.isTyping}
+              onBack={() => setActiveChat('')}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center font-medium text-muted">
+              Selecione uma conversa ao lado para começar.
+            </div>
+          )
         ) : (
-          <div className="flex-1 flex items-center justify-center font-medium text-muted">
-            Selecione uma conversa ao lado para começar.
-          </div>
+          activeZulipChat ? (
+            <ChatWindow 
+              contact={{
+                jid: activeZulipChat.to,
+                name: activeZulipChat.to,
+                presence: 'available'
+              }} 
+              messages={(zulipMessages[`${activeZulipChat.to}:${activeZulipChat.topic}`] || []).map(m => ({
+                id: m.id.toString(),
+                content: m.content,
+                timestamp: new Date(m.timestamp * 1000).toISOString(),
+                isOwn: m.sender_email.toLowerCase() === zulipEmail.toLowerCase(),
+                status: 'sent'
+              }))} 
+              onSendMessage={sendZulipMessage} 
+              onBack={() => setZulipActiveChat(null as any)}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center font-medium text-muted">
+              Selecione um canal ou tópico ao lado para começar.
+            </div>
+          )
         )}
       </div>
     </div>

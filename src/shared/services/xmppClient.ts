@@ -35,6 +35,48 @@ export class XMPPClientService extends EventTarget {
     this.dispatchEvent(new CustomEvent('status', { detail: newStatus }));
   }
 
+  public register(jid: string, password: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const username = jid.split('@')[0];
+      const domain = jid.split('@')[1] || 'xmpp.jp';
+      
+      const registerClient = client({
+        service: `wss://${domain}:5281/xmpp-websocket`,
+        domain,
+      });
+
+      registerClient.on('error', (err: any) => {
+        console.error('Registration Error:', err);
+        reject(err);
+      });
+      
+      registerClient.on('input', (data: any) => {
+        if (data.is('stream:features') && data.getChild('register', 'http://jabber.org/features/iq-register')) {
+          const iq = xml('iq', { type: 'set', id: 'reg1' },
+            xml('query', { xmlns: 'jabber:iq:register' },
+              xml('username', {}, username),
+              xml('password', {}, password)
+            )
+          );
+          registerClient.send(iq);
+        }
+      });
+
+      registerClient.on('stanza', (stanza: any) => {
+        if (stanza.is('iq') && stanza.attrs.id === 'reg1') {
+          if (stanza.attrs.type === 'result') {
+            registerClient.stop().then(() => resolve());
+          } else {
+            const error = stanza.getChild('error');
+            reject(new Error(error?.getChildText('text') || 'Falha no registro. Nome de usuário pode já existir.'));
+          }
+        }
+      });
+
+      registerClient.start().catch(reject);
+    });
+  }
+
   public connect(jid: string, password: string): Promise<void> {
     return new Promise((resolve, reject) => {
       this.setStatus('connecting');
@@ -244,10 +286,17 @@ export class XMPPClientService extends EventTarget {
       }
     }
 
-    const iq = xml('iq', { type: 'set' },
+    const iqId = `vcard-set-${Date.now()}`;
+    const iq = xml('iq', { type: 'set', id: iqId },
       xml('vCard', { xmlns: 'vcard-temp' }, ...vCardContent)
     );
-    await this.xmpp.sendReceive(iq);
+    console.log('Enviando vCard:', iq.toString());
+    try {
+      await this.xmpp.sendReceive(iq);
+    } catch (err) {
+      console.error('publishVCard falhou:', err);
+      throw err;
+    }
   }
 
   public async fetchHistory(withJid?: string): Promise<void> {

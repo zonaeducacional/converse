@@ -39,9 +39,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             : 'bg-surface border border-border text-foreground rounded-2xl rounded-bl-sm dark:bg-surface-dark dark:border-border'
         }`}
       >
-        <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words font-sans">
-          {content}
-        </p>
+        {/* Zulip pode retornar HTML. Para simplificar, renderizamos como texto ou HTML se detectar tags */}
+        {content.includes('<') && content.includes('>') ? (
+          <div 
+            className="text-[15px] leading-relaxed break-words font-sans zulip-content"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        ) : (
+          <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words font-sans">
+            {content}
+          </p>
+        )}
         
         <div className={`flex items-center justify-end gap-1 mt-1 text-[11px] font-mono ${isOwn ? 'text-indigo-200' : 'text-muted'}`}>
           {/* O timestamp completo (absoluto) vai no title (hover) */}

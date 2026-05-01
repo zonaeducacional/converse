@@ -77,8 +77,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
       });
       alert('Perfil atualizado com sucesso!');
       onClose();
-    } catch (err) {
-      alert('Falha ao salvar perfil.');
+    } catch (err: any) {
+      console.error(err);
+      alert('Falha ao salvar perfil. Servidor rejeitou a atualização. Erro: ' + (err.message || 'Desconhecido'));
     } finally {
       setSaving(false);
     }
